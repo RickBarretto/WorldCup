@@ -1,15 +1,16 @@
 package main
 
-import "bytes"
-import "encoding/json"
-import "io"
-import "log"
-import "net/http"
-import "strconv"
-import "strings"
-import "sync"
-import "time"
-
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
 
 /// Object sent for follower replication of leader operations
 type ReplicateRequest struct {
@@ -61,15 +62,49 @@ func (node *Node) isLeader() bool {
 ///
 /// The highest available ID is the leader.
 func (node *Node) electLeader() {
-	highestID := node.id
-	highestAddress := node.addr
+	// choose the highest *reachable* ID (bully algorithm variant)
+	isAvailable := func(id PeerID, address Address) bool {
+		// self is always considered available
+		if id == node.id {
+			return true
+		}
+
+		url := strings.TrimRight(address, "/") + "/status"
+		resp, err := node.client.Get(url)
+		if err != nil {
+			return false
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		return resp.StatusCode == http.StatusOK
+	}
+
+	highestID := -1
+	highestAddress := ""
+
+	// consider self
+	if isAvailable(node.id, node.addr) {
+		highestID = node.id
+		highestAddress = node.addr
+	}
 
 	for peer_id, peer_address := range node.peers {
+		if !isAvailable(peer_id, peer_address) {
+			continue
+		}
+
 		if peer_id > highestID {
 			highestID = peer_id
 			highestAddress = peer_address
 		}
 	}
+
+	// fallback to self if nothing reachable (shouldn't normally happen)
+	if highestID == -1 {
+		highestID = node.id
+		highestAddress = node.addr
+	}
+
 	node.mu.Lock()
 	node.leaderID = highestID
 	node.leaderAddr = highestAddress
@@ -155,6 +190,16 @@ func (node *Node) forwardToLeader(
 	req.Header = request.Header.Clone()
 	resp, err := node.client.Do(req)
 	if err != nil {
+		// leader failed to respond — trigger immediate re-election and retry once
+		newLeader := TriggerReElection(leader, err, node)
+
+		isNewLeader := newLeader != "" && newLeader != leader
+		
+		if isNewLeader {
+			success := forwardRequest(newLeader, request, bodyBytes, node, writer)
+			if success { return }
+		}
+
 		http.Error(writer, "leader unreachable: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}
@@ -166,6 +211,44 @@ func (node *Node) forwardToLeader(
 
 	writer.WriteHeader(resp.StatusCode)
 	io.Copy(writer, resp.Body)
+}
+
+
+func forwardRequest(
+	newLeader Address, 
+	request *http.Request, 
+	bodyBytes []byte, 
+	node *Node, 
+	writer http.ResponseWriter,
+) bool {
+	url := strings.TrimRight(newLeader, "/") + request.URL.Path
+	retryRequest, error := http.NewRequest(request.Method, url, bytes.NewReader(bodyBytes))
+	
+	if error == nil {
+		retryRequest.Header = request.Header.Clone()
+		response, requestError := node.client.Do(retryRequest)
+		if requestError == nil {
+			defer response.Body.Close()
+			for k, v := range response.Header {
+				writer.Header()[k] = v
+			}
+			writer.WriteHeader(response.StatusCode)
+			io.Copy(writer, response.Body)
+			return true
+		}
+	}
+
+	return false
+}
+
+func TriggerReElection(leader Address, err error, node *Node) Address {
+	log.Printf("forward: leader %s unreachable: %v; triggering re-election", leader, err)
+	node.electLeader()
+
+	node.mu.RLock()
+	newLeader := node.leaderAddr
+	node.mu.RUnlock()
+	return newLeader
 }
 
 func (node *Node) handleGetCards(
