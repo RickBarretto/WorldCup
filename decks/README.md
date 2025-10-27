@@ -99,3 +99,20 @@ List global deck:
 ```sh
 curl http://localhost:8003/cards
 ```
+
+## Features
+
+### Admins
+- Manage the global deck: create, remove and list global cards.
+- Inspect cluster and node state
+- Responsible for operational tasks and global data
+
+### Users
+- Manage their own per-user deck: list, add and remove cards belonging to their account.
+- Read global deck contents.
+
+### System
+- Leader: Takes decisions and followers replicates
+- Leader election: elects the highest on-line ID leader
+- If the leader fails, re-elect a new leader
+- If some follower fails, this gets a snapshot from the current leader.
