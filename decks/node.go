@@ -76,7 +76,7 @@ func (node *Node) electLeader() {
 	node.mu.Unlock()
 }
 
-func (node *Node) startLeaderLoop() {
+func (node *Node) StartLeaderLoop() {
 	ticker := time.NewTicker(3 * time.Second)
 	go func() {
 		for range ticker.C {
