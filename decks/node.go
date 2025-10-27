@@ -1,16 +1,15 @@
 package main
 
-import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"log"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-)
+import "bytes"
+import "encoding/json"
+import "io"
+import "log"
+import "net/http"
+import "strconv"
+import "strings"
+import "sync"
+import "time"
+
 
 // ReplicateRequest used by leader to replicate an operation
 type ReplicateRequest struct {

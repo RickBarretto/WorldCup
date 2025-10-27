@@ -1,11 +1,9 @@
 package main
 
-import (
-	"flag"
-	"log"
-	"strconv"
-	"strings"
-)
+import "flag"
+import "log"
+import "strconv"
+import "strings"
 
 func NodeFromCLI() (Address, *Node) {
 	idFlag := flag.Int("id", 1, "numeric id for this node")
