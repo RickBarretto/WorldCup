@@ -100,6 +100,24 @@ List global deck:
 curl http://localhost:8003/cards
 ```
 
+## Claiming a card
+
+Claim a card for `john`:
+
+```sh
+curl http://localhost:8001/users/john/claim
+```
+
+```sh
+curl http://localhost:8001/users/john/cards
+```
+
+As admin, you can check the before and after:
+
+```sh
+curl http://localhost:8001/cards
+```
+
 ## Features
 
 ### Admins

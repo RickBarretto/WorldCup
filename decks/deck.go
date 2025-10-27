@@ -19,9 +19,9 @@ func NewDeck() *Deck {
 
 // DeckStore holds the global deck and per-user decks.
 type DeckStore struct {
-	mu      sync.RWMutex
-	global  *Deck
-	users   map[string]*Deck
+	mu     sync.RWMutex
+	global *Deck
+	users  map[string]*Deck
 }
 
 func NewDeckStore() *DeckStore {

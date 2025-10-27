@@ -43,7 +43,7 @@ func NodeFromCLI() (Address, *Node) {
 	return normalizedAddress, node
 }
 
-/// server expects addr like http://host:port; extract host:port for Listen
+// / server expects addr like http://host:port; extract host:port for Listen
 func normalizeAddress(addressFlag *string) Address {
 	listenAddr := ""
 	if strings.HasPrefix(*addressFlag, "http://") {

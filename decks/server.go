@@ -2,27 +2,22 @@ package main
 
 import "github.com/gin-gonic/gin"
 
-/// Add Routes to a Node
+// / Add Routes to a Node
 func (node *Node) AddRoutes(router *gin.Engine) {
-	// -- Domain endpoints --
-	
-	// Global deck endpoints
+	// -- User endpoints --
+	router.GET("/users/:user/claim", gin.WrapF(node.handleClaim))
+	router.GET("/users/:user/cards", gin.WrapF(node.handleGetCards))
+
+	// -- Admin endpoints --
 	router.GET("/cards", gin.WrapF(node.handleGetCards))
 	router.POST("/cards", gin.WrapF(node.handlePostCard))
 	router.DELETE("/cards/:id", gin.WrapF(node.handleDeleteCard))
-	
-	// Per-user deck endpoints (preferred)
-	router.GET("/users/:user/cards", gin.WrapF(node.handleGetCards))
+
 	router.POST("/users/:user/cards", gin.WrapF(node.handlePostCard))
 	router.DELETE("/users/:user/cards/:id", gin.WrapF(node.handleDeleteCard))
 
-
 	// -- Peer endpoints --
-
-	// Admin endpoints
 	router.GET("/status", gin.WrapF(node.handleStatus))
-	
-	// Private endpoints
 	router.GET("/snapshot", gin.WrapF(node.handleSnapshot))
 	router.POST("/replicate", gin.WrapF(node.handleReplicate))
 }

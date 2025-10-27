@@ -13,18 +13,16 @@ import (
 	"time"
 )
 
-/// Object sent for follower replication of leader operations
+// / Object sent for follower replication of leader operations
 type ReplicateRequest struct {
 	Op   string `json:"op"`
 	Card Card   `json:"card"`
 	User string `json:"user,omitempty"`
 }
 
-
 type PeerID = int
 type Address = string
 type Peers = map[PeerID]Address
-
 
 type Node struct {
 	id         PeerID
@@ -37,12 +35,11 @@ type Node struct {
 	mu         sync.RWMutex
 }
 
-/// Representation of the Leader state
+// / Representation of the Leader state
 type Snapshot struct {
-	Global []Card              `json:"global"`
-	Users  map[string][]Card   `json:"users"`
+	Global []Card            `json:"global"`
+	Users  map[string][]Card `json:"users"`
 }
-
 
 func NewNode(id PeerID, addr Address, peers Peers) *Node {
 	node := &Node{
@@ -66,9 +63,9 @@ func (node *Node) isLeader() bool {
 	return node.leaderID == node.id
 }
 
-/// Elect a leader via bully algorithm.
-///
-/// The highest available ID is the leader.
+// / Elect a leader via bully algorithm.
+// /
+// / The highest available ID is the leader.
 func (node *Node) electLeader() {
 	// choose the highest *reachable* ID (bully algorithm variant)
 	isAvailable := func(id PeerID, address Address) bool {
@@ -128,7 +125,7 @@ func (node *Node) StartLeaderLoop() {
 	}()
 }
 
-/// Return the state of the current node for recovery or replication.
+// / Return the state of the current node for recovery or replication.
 func (node *Node) handleSnapshot(writer http.ResponseWriter, request *http.Request) {
 	// build snapshot from the in-memory DeckStore
 	node.mu.RLock()
@@ -203,7 +200,7 @@ func (node *Node) SyncFromLeader() error {
 	return nil
 }
 
-/// Send commands to other peers to replace the same behavior.
+// / Send commands to other peers to replace the same behavior.
 func (node *Node) replicateToFollowers(request ReplicateRequest) {
 	data, _ := json.Marshal(request)
 
@@ -239,7 +236,7 @@ func (node *Node) replicateToFollowers(request ReplicateRequest) {
 	}
 }
 
-/// Forward incoming requests to the leader and proxy the response
+// / Forward incoming requests to the leader and proxy the response
 func (node *Node) forwardToLeader(
 	writer http.ResponseWriter,
 	request *http.Request,
@@ -277,10 +274,12 @@ func (node *Node) forwardToLeader(
 		newLeader := TriggerReElection(leader, err, node)
 
 		isNewLeader := newLeader != "" && newLeader != leader
-		
+
 		if isNewLeader {
 			success := forwardRequest(newLeader, request, bodyBytes, node, writer)
-			if success { return }
+			if success {
+				return
+			}
 		}
 
 		http.Error(writer, "leader unreachable: "+err.Error(), http.StatusServiceUnavailable)
@@ -296,17 +295,16 @@ func (node *Node) forwardToLeader(
 	io.Copy(writer, resp.Body)
 }
 
-
 func forwardRequest(
-	newLeader Address, 
-	request *http.Request, 
-	bodyBytes []byte, 
-	node *Node, 
+	newLeader Address,
+	request *http.Request,
+	bodyBytes []byte,
+	node *Node,
 	writer http.ResponseWriter,
 ) bool {
 	url := strings.TrimRight(newLeader, "/") + request.URL.Path
 	retryRequest, error := http.NewRequest(request.Method, url, bytes.NewReader(bodyBytes))
-	
+
 	if error == nil {
 		retryRequest.Header = request.Header.Clone()
 		response, requestError := node.client.Do(retryRequest)
@@ -366,6 +364,129 @@ func (node *Node) handleGetCards(
 	cards := node.deck.List(user)
 	writer.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(writer).Encode(cards)
+}
+
+// / Move the last card from the global deck to the specific user
+// /
+// / To have consistent behavior, this reuses the routes
+// / DELETE /cards/:id and POST /users/:user/cards
+func (node *Node) handleClaim(writer http.ResponseWriter, request *http.Request) {
+
+	if !node.isLeader() {
+		node.forwardToLeader(writer, request)
+		return
+	}
+
+	// extract user from path (/users/:user/claim)
+	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
+	if len(parts) < 3 || parts[0] != "users" {
+		http.Error(writer, "bad path", http.StatusBadRequest)
+		return
+	}
+	user := parts[1]
+
+	// get global list and pick last card
+	list := node.deck.List("")
+
+	if len(list) == 0 {
+		node.regenGlobalDeck(20)
+		list = node.deck.List("")
+	}
+
+	if len(list) == 0 {
+		http.Error(writer, "no cards available", http.StatusServiceUnavailable)
+		return
+	}
+
+	card := list[len(list)-1]
+
+	// DELETE /cards/:id (re-use route)
+	node.mu.RLock()
+	leader := node.leaderAddr
+	node.mu.RUnlock()
+
+	// build URLs against leader so followers that forward will reach the true leader
+	deleteURL := strings.TrimRight(leader, "/") + "/cards/" + strconv.Itoa(card.ID)
+	reqDel, err := http.NewRequest("DELETE", deleteURL, nil)
+	if err != nil {
+		http.Error(writer, "failed to build delete request", http.StatusInternalServerError)
+		return
+	}
+
+	respDel, err := node.client.Do(reqDel)
+	if err != nil || respDel.StatusCode >= 300 {
+		if respDel != nil {
+			io.Copy(io.Discard, respDel.Body)
+			respDel.Body.Close()
+		}
+		http.Error(writer, "failed to remove from global deck", http.StatusServiceUnavailable)
+		return
+	}
+	io.Copy(io.Discard, respDel.Body)
+	respDel.Body.Close()
+
+	// POST /users/:user/cards
+	postURL := strings.TrimRight(leader, "/") + "/users/" + user + "/cards"
+	body, _ := json.Marshal(card)
+	reqPost, err := http.NewRequest("POST", postURL, bytes.NewReader(body))
+	if err != nil {
+		http.Error(writer, "failed to build post request", http.StatusInternalServerError)
+		return
+	}
+	reqPost.Header.Set("Content-Type", "application/json")
+
+	respPost, err := node.client.Do(reqPost)
+	if err != nil {
+		if respPost != nil {
+			io.Copy(io.Discard, respPost.Body)
+			respPost.Body.Close()
+		}
+		http.Error(writer, "failed to add card to user", http.StatusServiceUnavailable)
+		return
+	}
+	defer respPost.Body.Close()
+
+	// proxy response back to client
+	for k, v := range respPost.Header {
+		writer.Header()[k] = v
+	}
+	writer.WriteHeader(respPost.StatusCode)
+	io.Copy(writer, respPost.Body)
+}
+
+// / Generate n random cards and adds to the global deck.
+func (node *Node) regenGlobalDeck(n int) {
+	node.mu.RLock()
+	leader := node.leaderAddr
+	node.mu.RUnlock()
+
+	if leader == "" {
+		log.Printf("regen: no leader known, aborting regen")
+		return
+	}
+
+	for i := range n {
+		id := int(time.Now().UnixNano()%1e9) + i
+		c := Card{ID: id, Name: fmt.Sprintf("Card-%d", id)}
+		url := strings.TrimRight(leader, "/") + "/cards"
+		body, _ := json.Marshal(c)
+		req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+		if err != nil {
+			log.Printf("regen: failed to build POST request: %v", err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := node.client.Do(req)
+		if err != nil {
+			log.Printf("regen: POST /cards failed: %v", err)
+			continue
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			log.Printf("regen: non-2xx from POST /cards: %s", resp.Status)
+		}
+	}
 }
 
 func (node *Node) handlePostCard(
