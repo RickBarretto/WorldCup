@@ -1,3 +1,3 @@
-module distributed-deck
+module world-cup
 
-go 1.20
+go 1.25
