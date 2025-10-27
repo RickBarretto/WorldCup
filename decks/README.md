@@ -34,17 +34,17 @@ go build -o decks.exe ./decks
 ### Starting
 
 - **Node 1**
-```powershell
+```sh
 ./decks.exe -id=1 -addr=http://localhost:8001 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
 ```
 
 - **Node 2**
-```powershell
+```sh
 ./decks.exe -id=2 -addr=http://localhost:8002 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
 ```
 
 - **Node 3**
-```powershell
+```sh
 ./decks.exe -id=3 -addr=http://localhost:8003 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
 ```
 
@@ -52,24 +52,24 @@ go build -o decks.exe ./decks
 
 - Add a card
 
-```powershell
+```sh
 curl -X POST http://localhost:8001/cards -H "Content-Type: application/json" -d '{"id":101,"name":"Ace"}'
 ```
 
 - List cards from a follower
 
-```powershell
+```sh
 curl http://localhost:8002/cards
 ```
 
 - Delete a card
 
-```powershell
+```sh
 curl -X DELETE http://localhost:8002/cards/101 -v
 ```
 
 - List Cards
 
-```powershell
+```sh
 curl http://localhost:8003/cards
 ```
