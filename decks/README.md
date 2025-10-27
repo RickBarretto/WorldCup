@@ -32,8 +32,11 @@ Global Deck API:
 - `DELETE /cards/:id`
     - Remove a card from the global deck
 
+Node API:
 - `POST /replicate`
     - Internal endpoint for replication (peers only)
+- `GET /snapshot`
+    - Internal endpoint for sync with leader (peer only)
 - `GET /status`
     - Node status and current leader
 
