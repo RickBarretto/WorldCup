@@ -12,14 +12,14 @@ import (
 
 
 func main() {
-    listenAddr, node := initializeNode()
+    address, node := initializeNode()
 
     node.startLeaderLoop()
     node.AddRoutes()
-    node.StartAt(listenAddr)
+    node.Serve(address)
 }
 
-func (node *Node) StartAt(listenAddr Address) {
+func (node *Node) Serve(listenAddr Address) {
 	log.Printf("node %d starting on %s, peers=%v, leader=%d (%s)", node.id, listenAddr, node.peers, node.leaderID, node.leaderAddr)
 	if err := http.ListenAndServe(listenAddr, nil); err != nil {
 		fmt.Fprintln(os.Stderr, "server error:", err)
