@@ -18,19 +18,24 @@ type ReplicateRequest struct {
 	Card Card   `json:"card"`
 }
 
+type PeerID = int
+type Address = string
+type Peers = map[PeerID]Address
+
+
 // Node holds node info and state
 type Node struct {
-	id         int
-	addr       string
-	peers      map[int]string // id -> addr
-	leaderID   int
-	leaderAddr string
+	id         PeerID
+	addr       Address
+	peers      Peers // id -> addr
+	leaderID   PeerID
+	leaderAddr Address
 	deck       *Deck
 	client     *http.Client
 	mu         sync.RWMutex // protects leaderID/leaderAddr
 }
 
-func NewNode(id int, addr string, peers map[int]string) *Node {
+func NewNode(id PeerID, addr Address, peers Peers) *Node {
 	node := &Node{
 		id:    id,
 		addr:  addr,
