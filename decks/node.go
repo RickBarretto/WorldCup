@@ -11,28 +11,29 @@ import "sync"
 import "time"
 
 
-// ReplicateRequest used by leader to replicate an operation
+/// Object sent for follower replication of leader operations
 type ReplicateRequest struct {
-	Op   string `json:"op"` // "add" or "remove"
+	Op   string `json:"op"`
 	Card Card   `json:"card"`
 }
+
 
 type PeerID = int
 type Address = string
 type Peers = map[PeerID]Address
 
 
-// Node holds node info and state
 type Node struct {
 	id         PeerID
 	addr       Address
-	peers      Peers // id -> addr
+	peers      Peers
 	leaderID   PeerID
 	leaderAddr Address
 	deck       *Deck
 	client     *http.Client
-	mu         sync.RWMutex // protects leaderID/leaderAddr
+	mu         sync.RWMutex
 }
+
 
 func NewNode(id PeerID, addr Address, peers Peers) *Node {
 	node := &Node{

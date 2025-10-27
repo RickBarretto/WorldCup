@@ -6,9 +6,14 @@ import "strconv"
 import "strings"
 
 func NodeFromCLI() (Address, *Node) {
+
+	/// Example: -id=1
 	idFlag := flag.Int("id", 1, "numeric id for this node")
+	/// Example: -addr=http://localhost:8001
 	addressFlag := flag.String("addr", "http://localhost:8001", "public address for this node, used by peers (include scheme and port)")
+	/// Example: -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
 	peersFlag := flag.String("peers", "", "comma-separated list of peers as id=addr,id=addr")
+
 	flag.Parse()
 
 	peers := make(Peers)
