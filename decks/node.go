@@ -16,6 +16,7 @@ import (
 type ReplicateRequest struct {
 	Op   string `json:"op"`
 	Card Card   `json:"card"`
+	User string `json:"user,omitempty"`
 }
 
 
@@ -30,7 +31,7 @@ type Node struct {
 	peers      Peers
 	leaderID   PeerID
 	leaderAddr Address
-	deck       *Deck
+	deck       *DeckStore
 	client     *http.Client
 	mu         sync.RWMutex
 }
@@ -41,7 +42,7 @@ func NewNode(id PeerID, addr Address, peers Peers) *Node {
 		id:    id,
 		addr:  addr,
 		peers: peers,
-		deck:  NewDeck(),
+		deck:  NewDeckStore(),
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
@@ -251,11 +252,36 @@ func TriggerReElection(leader Address, err error, node *Node) Address {
 	return newLeader
 }
 
+// getUserFromRequest extracts the target user for the deck from the request.
+// Priority: query parameter `user` -> header `X-User` -> empty string (global deck)
+func getUserFromRequest(request *http.Request) string {
+	if request == nil {
+		return ""
+	}
+	// First, try to parse path of form /users/:user/...
+	path := strings.Trim(request.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) >= 2 && parts[0] == "users" {
+		return strings.TrimSpace(parts[1])
+	}
+
+	// Query param fallback
+	q := request.URL.Query().Get("user")
+	if q != "" {
+		return strings.TrimSpace(q)
+	}
+
+	// Header fallback
+	h := request.Header.Get("X-User")
+	return strings.TrimSpace(h)
+}
+
 func (node *Node) handleGetCards(
 	writer http.ResponseWriter,
 	request *http.Request,
 ) {
-	cards := node.deck.List()
+	user := getUserFromRequest(request)
+	cards := node.deck.List(user)
 	writer.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(writer).Encode(cards)
 }
@@ -268,17 +294,18 @@ func (node *Node) handlePostCard(
 		node.forwardToLeader(writer, request)
 		return
 	}
-
 	var c Card
 	if err := json.NewDecoder(request.Body).Decode(&c); err != nil {
 		http.Error(writer, "invalid json", http.StatusBadRequest)
 		return
 	}
 
-	node.deck.Add(c)
+	user := getUserFromRequest(request)
 
-	// replicate
-	node.replicateToFollowers(ReplicateRequest{Op: "add", Card: c})
+	node.deck.Add(user, c)
+
+	// replicate (include user so followers update the same user's deck)
+	node.replicateToFollowers(ReplicateRequest{Op: "add", Card: c, User: user})
 	writer.WriteHeader(http.StatusCreated)
 	json.NewEncoder(writer).Encode(c)
 }
@@ -287,16 +314,27 @@ func (node *Node) handleDeleteCard(
 	writer http.ResponseWriter,
 	request *http.Request,
 ) {
-	// path expected: /cards/{id}
+	// Support both:
+	//  - /cards/{id}
+	//  - /users/{user}/cards/{id}
 	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
 
-	if len(parts) != 2 {
+	var idPart string
+	if len(parts) >= 4 && parts[0] == "users" {
+		// expect: users/:user/cards/:id
+		if parts[2] != "cards" {
+			http.Error(writer, "bad path", http.StatusBadRequest)
+			return
+		}
+		idPart = parts[len(parts)-1]
+	} else if len(parts) == 2 && parts[0] == "cards" {
+		idPart = parts[1]
+	} else {
 		http.Error(writer, "bad path", http.StatusBadRequest)
 		return
 	}
 
-	id, err := strconv.Atoi(parts[1])
-
+	id, err := strconv.Atoi(idPart)
 	if err != nil {
 		http.Error(writer, "invalid id", http.StatusBadRequest)
 		return
@@ -307,8 +345,10 @@ func (node *Node) handleDeleteCard(
 		return
 	}
 
-	node.deck.Remove(id)
-	node.replicateToFollowers(ReplicateRequest{Op: "remove", Card: Card{ID: id}})
+	user := getUserFromRequest(request)
+
+	node.deck.Remove(user, id)
+	node.replicateToFollowers(ReplicateRequest{Op: "remove", Card: Card{ID: id}, User: user})
 	writer.WriteHeader(http.StatusNoContent)
 }
 
@@ -325,9 +365,9 @@ func (node *Node) handleReplicate(
 
 	switch req.Op {
 	case "add":
-		node.deck.Add(req.Card)
+		node.deck.Add(req.User, req.Card)
 	case "remove":
-		node.deck.Remove(req.Card.ID)
+		node.deck.Remove(req.User, req.Card.ID)
 	default:
 		http.Error(writer, "unknown op", http.StatusBadRequest)
 		return

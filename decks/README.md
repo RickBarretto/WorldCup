@@ -4,20 +4,37 @@ This service manages the player's decks.
 
 Overview
 - Leader election: the node with the highest numeric `-id` is the leader.
-- Leader handles mutating operations (POST /cards, DELETE /cards/{id}) and asynchronously replicates them to peers via POST /replicate.
-- Followers forward mutating requests to the leader; GET /cards is served locally.
+- Leader handles mutating operations and asynchronously replicates them to peers via POST /replicate.
+- Followers forward mutating requests to the leader; GET requests are served locally from each node's deck store.
 
 ## API Endpoints
 
-- `GET /cards`: 
-    - List cards
-- `POST /cards`: 
-    - Add a card (JSON: `{"id":123,"name":"ace"}`); 
-- `DELETE /cards/{id}`: 
-    - Remove a card; 
-- `POST /replicate`: 
-    - Internal endpoint for replication
-- `GET /status`: 
+There are two kinds of decks:
+
+- Global deck: Global Storage that generates and rewards players.
+- Per-user deck: User owned deck management.
+
+Per-user API:
+
+- `GET /users/:user/cards`
+    - List cards for `:user`
+- `POST /users/:user/cards`
+    - Add a card for `:user` (JSON: `{"id":123,"name":"ace"}`)
+- `DELETE /users/:user/cards/:id`
+    - Remove card `:id` from `:user`'s deck
+
+Global Deck API:
+
+- `GET /cards`
+    - List cards from the global deck
+- `POST /cards`
+    - Add a card to the global deck
+- `DELETE /cards/{id}`
+    - Remove a card from the global deck
+
+- `POST /replicate`
+    - Internal endpoint for replication (peers only)
+- `GET /status`
     - Node status and current leader
 
 Some of those endpoints just returns values and others proxies the leader node. But for the user the behavior would be the same for any node.
@@ -25,7 +42,6 @@ Some of those endpoints just returns values and others proxies the leader node. 
 ## Real Usage
 
 ### Build
-From the repository root (where `go.mod` is located), run:
 
 ```sh
 go build -o decks.exe ./decks
@@ -50,25 +66,35 @@ go build -o decks.exe ./decks
 
 ### CURL Usage
 
-- Add a card
+Per-user examples:
+
+Add a card for user `john`:
 
 ```sh
-curl -X POST http://localhost:8001/cards -H "Content-Type: application/json" -d '{"id":101,"name":"Ace"}'
+curl -X POST http://localhost:8001/users/john/cards -H "Content-Type: application/json" -d '{"id":101,"name":"Ace"}'
 ```
 
-- List cards from a follower
+List john's cards:
 
 ```sh
-curl http://localhost:8002/cards
+curl http://localhost:8002/users/john/cards
 ```
 
-- Delete a card
+Delete a card for john:
 
 ```sh
-curl -X DELETE http://localhost:8002/cards/101 -v
+curl -X DELETE http://localhost:8002/users/john/cards/101 -v
 ```
 
-- List Cards
+Global deck examples:
+
+Add to global deck:
+
+```sh
+curl -X POST http://localhost:8001/cards -H "Content-Type: application/json" -d '{"id":201,"name":"King"}'
+```
+
+List global deck:
 
 ```sh
 curl http://localhost:8003/cards
