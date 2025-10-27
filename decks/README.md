@@ -29,7 +29,7 @@ Global Deck API:
     - List cards from the global deck
 - `POST /cards`
     - Add a card to the global deck
-- `DELETE /cards/{id}`
+- `DELETE /cards/:id`
     - Remove a card from the global deck
 
 - `POST /replicate`
