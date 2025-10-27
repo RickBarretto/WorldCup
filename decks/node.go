@@ -20,6 +20,14 @@ type ReplicateRequest struct {
 	User string `json:"user,omitempty"`
 }
 
+// TradeRequest describes a swap between two users' cards.
+type TradeRequest struct {
+	UserA   string `json:"user_a"`
+	UserB   string `json:"user_b"`
+	ACardID int    `json:"a_card_id"`
+	BCardID int    `json:"b_card_id"`
+}
+
 type PeerID = int
 type Address = string
 type Peers = map[PeerID]Address
@@ -33,6 +41,8 @@ type Node struct {
 	deck       *DeckStore
 	client     *http.Client
 	mu         sync.RWMutex
+	trades      map[int]*TradeRequest
+	nextTradeID int
 }
 
 // / Representation of the Leader state
@@ -50,6 +60,7 @@ func NewNode(id PeerID, addr Address, peers Peers) *Node {
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
+		trades: make(map[int]*TradeRequest),
 	}
 
 	node.electLeader()
@@ -511,6 +522,122 @@ func (node *Node) handlePostCard(
 	node.replicateToFollowers(ReplicateRequest{Op: "add", Card: c, User: user})
 	writer.WriteHeader(http.StatusCreated)
 	json.NewEncoder(writer).Encode(c)
+}
+
+/// Propose trade of two cards
+/// 
+/// Example:
+/// POST /trade {"user_a":"alice","user_b":"bob","a_card_id":1,"b_card_id":2}
+func (node *Node) handleTrade(writer http.ResponseWriter, request *http.Request) {
+
+	if !node.isLeader() {
+		node.forwardToLeader(writer, request)
+		return
+	}
+
+	var trade TradeRequest
+	if err := json.NewDecoder(request.Body).Decode(&trade); err != nil {
+		http.Error(writer, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	if trade.UserA == "" || trade.UserB == "" || trade.ACardID == 0 || trade.BCardID == 0 {
+		http.Error(writer, "missing fields", http.StatusBadRequest)
+		return
+	}
+
+	// create and store proposal
+	node.mu.Lock()
+	node.nextTradeID++
+	id := node.nextTradeID
+	node.trades[id] = &trade
+	node.mu.Unlock()
+
+	out := map[string]interface{}{"trade_id": id, "status": "pending"}
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(out)
+}
+
+/// Accept the trade
+///
+/// Example:
+/// POST /trade/:id/accept with JSON {"user":"bob"}
+func (node *Node) handleTradeAccept(writer http.ResponseWriter, request *http.Request) {
+	if !node.isLeader() {
+		node.forwardToLeader(writer, request)
+		return
+	}
+
+	// extract id from path
+	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		http.Error(writer, "bad path", http.StatusBadRequest)
+		return
+	}
+	idStr := parts[1]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(writer, "invalid trade id", http.StatusBadRequest)
+		return
+	}
+
+	var payload struct{ User string `json:"user"` }
+	if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+		http.Error(writer, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	node.mu.Lock()
+	tr, ok := node.trades[id]
+	if !ok {
+		node.mu.Unlock()
+		http.Error(writer, "trade not found", http.StatusNotFound)
+		return
+	}
+	// ensure acceptor matches UserB
+	if payload.User != tr.UserB {
+		node.mu.Unlock()
+		http.Error(writer, "only the counterparty can accept the trade", http.StatusForbidden)
+		return
+	}
+	// remove from store to prevent double-accept
+	delete(node.trades, id)
+	node.mu.Unlock()
+
+	// verify both cards still exist
+	aCard, okA := findCardInList(node.deck.List(tr.UserA), tr.ACardID)
+	bCard, okB := findCardInList(node.deck.List(tr.UserB), tr.BCardID)
+	if !okA || !okB {
+		http.Error(writer, "one or both cards not found", http.StatusBadRequest)
+		return
+	}
+
+	// execute swap (leader does the mutating and replicates)
+	node.deck.Remove(tr.UserA, tr.ACardID)
+	node.replicateToFollowers(ReplicateRequest{Op: "remove", Card: Card{ID: tr.ACardID}, User: tr.UserA})
+
+	node.deck.Remove(tr.UserB, tr.BCardID)
+	node.replicateToFollowers(ReplicateRequest{Op: "remove", Card: Card{ID: tr.BCardID}, User: tr.UserB})
+
+	node.deck.Add(tr.UserA, bCard)
+	node.replicateToFollowers(ReplicateRequest{Op: "add", Card: bCard, User: tr.UserA})
+
+	node.deck.Add(tr.UserB, aCard)
+	node.replicateToFollowers(ReplicateRequest{Op: "add", Card: aCard, User: tr.UserB})
+
+	out := map[string]Card{"user_a_received": bCard, "user_b_received": aCard}
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(out)
+}
+
+// findCardInList returns the card with id from list and a bool indicating presence
+func findCardInList(list []Card, id int) (Card, bool) {
+	for _, c := range list {
+		if c.ID == id {
+			return c, true
+		}
+	}
+	return Card{}, false
 }
 
 func (node *Node) handleDeleteCard(

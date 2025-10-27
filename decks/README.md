@@ -67,7 +67,7 @@ go build -o decks.exe ./decks
 ./decks.exe -id=3 -addr=http://localhost:8003 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
 ```
 
-### CURL Usage
+### Administrator
 
 Per-user examples:
 
@@ -103,7 +103,7 @@ List global deck:
 curl http://localhost:8003/cards
 ```
 
-## Claiming a card
+### Claiming a card
 
 Claim a card for `john`:
 
@@ -119,6 +119,36 @@ As admin, you can check the before and after:
 
 ```sh
 curl http://localhost:8001/cards
+```
+
+### Trading cards
+
+```sh
+curl http://localhost:8001/john/claim
+curl http://localhost:8001/john/cards
+curl http://localhost:8001/doe/cards
+```
+
+```sh
+curl -X POST http://localhost:8001/trade -H "Content-Type: application/json" -d '{"user_a":"john","user_b":"doe","a_card_id": :card-id>,"b_card_id": <card-id>}'
+```
+
+If you try to accept with the wrong user:
+
+```sh
+curl -X POST http://localhost:8001/trade/1/accept -H "Content-Type: application/json" -d '{"user":"john"}'
+# only the counterparty can accept the trade
+```
+
+So...
+
+```sh
+curl -X POST http://localhost:8001/trade/1/accept -H "Content-Type: application/json" -d '{"user":"doe"}'
+```
+
+```sh
+curl http://localhost:8001/john/cards
+curl http://localhost:8001/doe/cards
 ```
 
 ## Features
