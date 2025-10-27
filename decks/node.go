@@ -33,22 +33,24 @@ type Address = string
 type Peers = map[PeerID]Address
 
 type Node struct {
-	id         PeerID
-	addr       Address
-	peers      Peers
-	leaderID   PeerID
-	leaderAddr Address
-	deck       *DeckStore
-	client     *http.Client
-	mu         sync.RWMutex
+	id          PeerID
+	addr        Address
+	peers       Peers
+	leaderID    PeerID
+	leaderAddr  Address
+	deck        *DeckStore
+	client      *http.Client
+	mu          sync.RWMutex
 	trades      map[int]*TradeRequest
 	nextTradeID int
 }
 
 // / Representation of the Leader state
 type Snapshot struct {
-	Global []Card            `json:"global"`
-	Users  map[string][]Card `json:"users"`
+	Global      []Card               `json:"global"`
+	Users       map[string][]Card    `json:"users"`
+	Trades      map[int]TradeRequest `json:"trades"`
+	NextTradeID int                  `json:"next_trade_id"`
 }
 
 func NewNode(id PeerID, addr Address, peers Peers) *Node {
@@ -155,6 +157,18 @@ func (node *Node) handleSnapshot(writer http.ResponseWriter, request *http.Reque
 		snap.Users[u] = d.List()
 	}
 
+	// copy pending trades and nextTradeID under node lock
+	node.mu.RLock()
+	snap.Trades = make(map[int]TradeRequest)
+	for id, tr := range node.trades {
+		if tr == nil {
+			continue
+		}
+		snap.Trades[id] = *tr
+	}
+	snap.NextTradeID = node.nextTradeID
+	node.mu.RUnlock()
+
 	writer.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(writer).Encode(snap)
 }
@@ -205,6 +219,15 @@ func (node *Node) SyncFromLeader() error {
 
 	node.mu.Lock()
 	node.deck = newStore
+
+	// restore trades
+	node.trades = make(map[int]*TradeRequest)
+	for id, tr := range snap.Trades {
+		t := tr
+		node.trades[id] = &t
+	}
+	node.nextTradeID = snap.NextTradeID
+
 	node.mu.Unlock()
 
 	log.Printf("sync: successfully synced state from leader %s (global=%d users=%d)", leader, len(snap.Global), len(snap.Users))
@@ -524,10 +547,10 @@ func (node *Node) handlePostCard(
 	json.NewEncoder(writer).Encode(c)
 }
 
-/// Propose trade of two cards
-/// 
-/// Example:
-/// POST /trade {"user_a":"alice","user_b":"bob","a_card_id":1,"b_card_id":2}
+// / Propose trade of two cards
+// /
+// / Example:
+// / POST /trade {"user_a":"alice","user_b":"bob","a_card_id":1,"b_card_id":2}
 func (node *Node) handleTrade(writer http.ResponseWriter, request *http.Request) {
 
 	if !node.isLeader() {
@@ -558,10 +581,10 @@ func (node *Node) handleTrade(writer http.ResponseWriter, request *http.Request)
 	json.NewEncoder(writer).Encode(out)
 }
 
-/// Accept the trade
-///
-/// Example:
-/// POST /trade/:id/accept with JSON {"user":"bob"}
+// / Accept the trade
+// /
+// / Example:
+// / POST /trade/:id/accept with JSON {"user":"bob"}
 func (node *Node) handleTradeAccept(writer http.ResponseWriter, request *http.Request) {
 	if !node.isLeader() {
 		node.forwardToLeader(writer, request)
@@ -581,7 +604,9 @@ func (node *Node) handleTradeAccept(writer http.ResponseWriter, request *http.Re
 		return
 	}
 
-	var payload struct{ User string `json:"user"` }
+	var payload struct {
+		User string `json:"user"`
+	}
 	if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 		http.Error(writer, "invalid json", http.StatusBadRequest)
 		return
