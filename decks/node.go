@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -34,6 +35,12 @@ type Node struct {
 	deck       *DeckStore
 	client     *http.Client
 	mu         sync.RWMutex
+}
+
+/// Representation of the Leader state
+type Snapshot struct {
+	Global []Card              `json:"global"`
+	Users  map[string][]Card   `json:"users"`
 }
 
 
@@ -119,6 +126,81 @@ func (node *Node) StartLeaderLoop() {
 			node.electLeader()
 		}
 	}()
+}
+
+/// Return the state of the current node for recovery or replication.
+func (node *Node) handleSnapshot(writer http.ResponseWriter, request *http.Request) {
+	// build snapshot from the in-memory DeckStore
+	node.mu.RLock()
+	ds := node.deck
+	node.mu.RUnlock()
+
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+
+	snap := Snapshot{
+		Global: ds.global.List(),
+		Users:  make(map[string][]Card),
+	}
+
+	for u, d := range ds.users {
+		snap.Users[u] = d.List()
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(writer).Encode(snap)
+}
+
+// SyncFromLeader attempts to fetch the leader snapshot and replace local state.
+// It is safe to call on startup; if the leader is unreachable or returns an error
+// the function logs and returns the error without mutating local state.
+func (node *Node) SyncFromLeader() error {
+	node.mu.RLock()
+	leader := node.leaderAddr
+	selfAddr := node.addr
+	node.mu.RUnlock()
+
+	if leader == "" || leader == selfAddr {
+		return nil
+	}
+
+	url := strings.TrimRight(leader, "/") + "/snapshot"
+	resp, err := node.client.Get(url)
+	if err != nil {
+		log.Printf("sync: failed to GET snapshot from leader %s: %v", leader, err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("sync: leader %s returned non-200: %s", leader, string(body))
+		return fmt.Errorf("non-200 from leader: %d", resp.StatusCode)
+	}
+
+	var snap Snapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snap); err != nil {
+		log.Printf("sync: failed to decode snapshot from leader %s: %v", leader, err)
+		return err
+	}
+
+	// build a new DeckStore populated from snapshot
+	newStore := NewDeckStore()
+	for _, c := range snap.Global {
+		newStore.Add("", c)
+	}
+	for u, cards := range snap.Users {
+		for _, c := range cards {
+			newStore.Add(u, c)
+		}
+	}
+
+	node.mu.Lock()
+	node.deck = newStore
+	node.mu.Unlock()
+
+	log.Printf("sync: successfully synced state from leader %s (global=%d users=%d)", leader, len(snap.Global), len(snap.Users))
+	return nil
 }
 
 /// Send commands to other peers to replace the same behavior.
