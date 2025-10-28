@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Decks — User</title>
+    <style>body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}nav a{margin-right:12px}</style>
+  </head>
+  <body>
+    <h1>Decks — User</h1>
+    <nav>
+      <a href="/">Main</a>
+      <a href="/admin">Admin</a>
+      <a href="/user">User</a>
+      <a id="tradeLink" href="/trade">Trade</a>
+    </nav>
+
+    <p id="userHint">Loading user...</p>
+
+    <h2 id="userTitle"></h2>
+
+    <button id="claimBtn">Claim one card</button>
+
+    <pre id="out" style="background:#f6f8fa;padding:12px;border-radius:6px;margin-top:12px"></pre>
+
+    <script>
+      // Set the trade link to include the username fragment when available
+      function setTradeLink(user){
+        const a = document.getElementById('tradeLink');
+        if(!a) return;
+        if(user) a.href = '/trade#' + encodeURIComponent(user);
+        else a.href = '/trade';
+      }
+
+      async function loadUser(user){
+        const out = document.getElementById('out');
+        const title = document.getElementById('userTitle');
+        title.textContent = 'User: ' + user;
+        out.textContent = 'loading...';
+        try{
+          const res = await fetch('/users/' + encodeURIComponent(user) + '/cards');
+          if(!res.ok) throw new Error(res.status+' '+res.statusText);
+          const data = await res.json();
+          out.textContent = JSON.stringify(data, null, 2);
+        }catch(err){ out.textContent = 'failed: '+err.message }
+      }
+
+      // Claim using the username from the hash
+      document.getElementById('claimBtn').addEventListener('click', async function(){
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        const user = hash ? decodeURIComponent(hash) : '';
+        if(!user) { window.location.href = '/'; return; }
+        const out = document.getElementById('out');
+        out.textContent = 'claiming...';
+        try{
+          const res = await fetch('/users/' + encodeURIComponent(user) + '/claim');
+          const txt = await res.text();
+          out.textContent = txt;
+          loadUser(user);
+        }catch(err){ out.textContent = err.message }
+      });
+
+      // On load: require hash username, otherwise redirect to /
+      (function(){
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        if(!hash){
+          // no username provided — send back to main
+          window.location.href = '/';
+          return;
+        }
+        const user = decodeURIComponent(hash);
+        document.getElementById('userHint').style.display = 'none';
+        setTradeLink(user);
+        loadUser(user);
+      })();
+
+      // If the hash changes to empty, redirect to /
+      window.addEventListener('hashchange', function(){
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        if(!hash) { window.location.href = '/'; return; }
+        const user = decodeURIComponent(hash);
+        setTradeLink(user);
+        loadUser(user);
+      });
+    </script>
+
+  </body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Decks — Admin</title>
+    <style>body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}nav a{margin-right:12px}</style>
+  </head>
+  <body>
+    <h1>Decks — Admin</h1>
+    <nav>
+      <a href="/">Main</a>
+      <a href="/admin">Admin</a>
+      <a href="/user">User</a>
+      <a href="/trade">Trade</a>
+    </nav>
+
+    <p>This is a lightweight admin page for managing cards.</p>
+
+    <section>
+      <h2>Global cards</h2>
+      <button id="reload">Reload</button>
+      <div id="list"></div>
+
+      <h3>Add card</h3>
+      <form id="addForm">
+        <input id="name" placeholder="card name" />
+        <button type="submit">Add</button>
+      </form>
+      <pre id="out" style="background:#f6f8fa;padding:12px;border-radius:6px;margin-top:12px"></pre>
+    </section>
+
+    <script>
+      async function load(){
+        const list = document.getElementById('list');
+        list.textContent = 'loading...';
+        try{
+          const res = await fetch('/cards');
+          if(!res.ok) throw new Error(res.status+' '+res.statusText);
+          const data = await res.json();
+          list.innerHTML = data.map(c => `<div style="margin:6px 0">#${c.id} — ${c.name} <button data-id="${c.id}" class="del">Delete</button></div>`).join('') || '<div>No cards</div>';
+          document.querySelectorAll('.del').forEach(btn=>btn.addEventListener('click', async e=>{
+            const id = e.target.dataset.id;
+            if(!confirm('Delete card '+id+'?')) return;
+            const r = await fetch('/cards/'+id, {method:'DELETE'});
+            if(r.ok){ load() } else { alert('delete failed: '+r.status) }
+          }));
+        }catch(err){ list.textContent = 'failed: '+err.message }
+      }
+
+      document.getElementById('reload').addEventListener('click', load);
+      document.getElementById('addForm').addEventListener('submit', async function(e){
+        e.preventDefault();
+        const name = document.getElementById('name').value.trim();
+        if(!name) return alert('enter a name');
+        const out = document.getElementById('out');
+        out.textContent = 'adding...';
+        try{
+          const body = { id: Math.floor(Date.now()%1e9), name };
+          const res = await fetch('/cards', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+          const txt = await res.text();
+          out.textContent = txt;
+          load();
+        }catch(err){ out.textContent = err.message }
+      });
+
+      load();
+    </script>
+
+  </body>
+</html>

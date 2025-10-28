@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+    <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Decks — Trade</title>
+    <style>
+      body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}
+      nav a{margin-right:12px}
+      .container{display:flex;gap:20px;align-items:flex-start}
+      main{flex:1;min-width:0}
+      aside.sidebar{width:320px;border-left:1px solid #eee;padding-left:12px}
+      .proposal{border:1px solid #ddd;padding:8px;margin:6px 0;border-radius:6px}
+      .muted{color:#666;font-size:0.9em}
+    </style>
+  </head>
+  <body>
+    <h1>Decks — Trade</h1>
+    <nav>
+      <a href="/">Main</a>
+      <a href="/admin">Admin</a>
+      <a href="/user">User</a>
+      <a href="/trade">Trade</a>
+    </nav>
+
+    <div class="container">
+      <main>
+        <p id="hint">Loading trade UI...</p>
+
+        <h2 id="userTitle"></h2>
+
+        <section>
+          <h3>Your cards</h3>
+          <div id="ownCards">loading...</div>
+          <div style="margin-top:8px">Selected offer: <span id="selectedOffer">none</span> <button id="clearOffer">Clear</button></div>
+        </section>
+
+        <section style="margin-top:16px">
+          <h3>Search other user's cards</h3>
+          <form id="searchForm">
+            <input id="searchUser" placeholder="other username" />
+            <button type="submit">Load</button>
+          </form>
+          <div id="otherCards">(no user loaded)</div>
+        </section>
+
+        <pre id="out" style="background:#f6f8fa;padding:12px;border-radius:6px;margin-top:12px"></pre>
+      </main>
+
+      <aside class="sidebar">
+        <h3>Incoming proposals</h3>
+        <div id="proposalsList">loading...</div>
+        <div class="muted" style="margin-top:8px">Only proposals where you are the counterparty (user_b) are shown here.</div>
+      </aside>
+    </div>
+
+    <script>
+      // helper to parse response: try JSON, fall back to text
+      async function parseResponse(res){
+        const ct = res.headers.get('content-type') || '';
+        if(ct.includes('application/json')){
+          try{ const j = await res.json(); return {ok: res.ok, status: res.status, data: j}; }
+          catch(e){ const txt = await res.text(); return {ok: res.ok, status: res.status, data: txt}; }
+        }
+        const txt = await res.text();
+        return {ok: res.ok, status: res.status, data: txt};
+      }
+
+      let currentUser = '';
+      let selectedOfferId = null;
+
+      function renderOwnCards(cards){
+        const el = document.getElementById('ownCards');
+        if(!Array.isArray(cards) || cards.length===0){ el.innerHTML = '<div>No cards</div>'; return; }
+        el.innerHTML = cards.map(c => `
+          <div style="border:1px solid #ddd;padding:8px;margin:6px 0;border-radius:6px;">
+            <strong>#${c.id}</strong> — ${c.name}
+            <button data-id="${c.id}" class="selectOffer" style="margin-left:12px">Select as offer</button>
+          </div>
+        `).join('');
+        el.querySelectorAll('.selectOffer').forEach(btn=>btn.addEventListener('click', function(){
+          selectedOfferId = parseInt(this.dataset.id,10);
+          document.getElementById('selectedOffer').textContent = '#'+selectedOfferId;
+        }));
+      }
+
+      function renderOtherCards(cards, otherUser){
+        const el = document.getElementById('otherCards');
+        if(!Array.isArray(cards) || cards.length===0){ el.innerHTML = '<div>No cards for user '+otherUser+'</div>'; return; }
+        el.innerHTML = cards.map(c => `
+          <div style="border:1px solid #ddd;padding:8px;margin:6px 0;border-radius:6px;">
+            <strong>#${c.id}</strong> — ${c.name}
+            <button data-id="${c.id}" data-user="${otherUser}" class="proposeBtn" style="margin-left:12px">Propose trade</button>
+          </div>
+        `).join('');
+        el.querySelectorAll('.proposeBtn').forEach(btn=>btn.addEventListener('click', async function(){
+          const targetId = parseInt(this.dataset.id,10);
+          const other = this.dataset.user;
+          if(!selectedOfferId) return alert('Select one of your cards as the offered card first');
+          await proposeTrade(currentUser, other, selectedOfferId, targetId);
+        }));
+      }
+
+      async function loadOwn(){
+        const out = document.getElementById('out');
+        try{
+          const res = await fetch('/users/' + encodeURIComponent(currentUser) + '/cards');
+          if(!res.ok) throw new Error(res.status+' '+res.statusText);
+          const data = await res.json();
+          renderOwnCards(data);
+        }catch(err){ out.textContent = 'failed to load own cards: '+err.message }
+      }
+
+      async function loadOther(user){
+        const out = document.getElementById('out');
+        out.textContent = 'loading other user...';
+        try{
+          const res = await fetch('/users/' + encodeURIComponent(user) + '/cards');
+          if(!res.ok) throw new Error(res.status+' '+res.statusText);
+          const data = await res.json();
+          renderOtherCards(data, user);
+          out.textContent = '';
+        }catch(err){ out.textContent = 'failed to load other cards: '+err.message }
+      }
+
+      async function proposeTrade(userA, userB, aCardId, bCardId){
+        const out = document.getElementById('out');
+        out.textContent = 'proposing trade...';
+        try{
+          const body = { user_a: userA, user_b: userB, a_card_id: aCardId, b_card_id: bCardId };
+          const res = await fetch('/trade', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+          const parsed = await parseResponse(res);
+          if(parsed.ok){
+            out.textContent = 'proposal created: ' + JSON.stringify(parsed.data, null, 2);
+          } else {
+            out.textContent = 'error ('+parsed.status+'): ' + (typeof parsed.data === 'string' ? parsed.data : JSON.stringify(parsed.data));
+          }
+        }catch(err){ out.textContent = 'failed: '+err.message }
+      }
+
+      document.getElementById('clearOffer').addEventListener('click', function(){ selectedOfferId = null; document.getElementById('selectedOffer').textContent = 'none'; });
+
+      document.getElementById('searchForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        const other = document.getElementById('searchUser').value.trim();
+        if(!other) return alert('enter a username to search');
+        loadOther(other);
+      });
+
+      // load incoming proposals from /snapshot and show those targeted at currentUser
+      async function loadProposals(){
+        const el = document.getElementById('proposalsList');
+        el.textContent = 'loading...';
+        try{
+          const res = await fetch('/snapshot');
+          if(!res.ok) throw new Error(res.status+' '+res.statusText);
+          const snap = await res.json();
+          const trades = snap.trades || snap.Trades || {};
+          // trades is an object keyed by id
+          const items = [];
+          for(const id in trades){
+            const t = trades[id];
+            // depending on encoding, keys might be user_b or UserB; normalize
+            const userB = t.user_b || t.UserB || t.userB || '';
+            if(userB === currentUser){
+              items.push({id: id, t: t});
+            }
+          }
+          if(items.length === 0){ el.innerHTML = '<div>No incoming proposals</div>'; return; }
+          el.innerHTML = items.map(it=>{
+            const t = it.t;
+            const userA = t.user_a || t.UserA || t.userA || 'unknown';
+            const aCard = t.a_card_id || t.ACardID || t.aCardId || 0;
+            const bCard = t.b_card_id || t.BCardID || t.bCardId || 0;
+            return `\
+              <div class="proposal">\
+                <div><strong>Trade #${it.id}</strong></div>\
+                <div class="muted">from: ${userA}</div>\
+                <div>they offer: #${aCard} — you would give: #${bCard}</div>\
+                <div style="margin-top:6px"><button data-id="${it.id}" class="acceptProposal">Accept</button></div>\
+              </div>`;
+          }).join('');
+          el.querySelectorAll('.acceptProposal').forEach(btn=>btn.addEventListener('click', async function(){
+            const id = this.dataset.id;
+            if(!confirm('Accept trade '+id+'?')) return;
+            try{
+              const res = await fetch('/trade/' + encodeURIComponent(id) + '/accept', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user: currentUser})});
+              const parsed = await parseResponse(res);
+              if(parsed.ok){
+                document.getElementById('out').textContent = 'accepted: '+JSON.stringify(parsed.data,null,2);
+              } else {
+                document.getElementById('out').textContent = 'error: '+(typeof parsed.data === 'string' ? parsed.data : JSON.stringify(parsed.data));
+              }
+            }catch(err){ document.getElementById('out').textContent = 'failed: '+err.message }
+            // refresh lists
+            loadProposals(); loadOwn();
+          }));
+        }catch(err){ el.textContent = 'failed: '+err.message }
+      }
+
+      // On load: require hash username, otherwise redirect to /
+      (function(){
+        const hash = (window.location.hash || '').replace(/^#/, '');
+        if(!hash){ window.location.href = '/'; return; }
+        currentUser = decodeURIComponent(hash);
+        document.getElementById('hint').style.display = 'none';
+        document.getElementById('userTitle').textContent = 'Trade as: ' + currentUser;
+        setTradeLink(currentUser);
+        loadOwn();
+        loadProposals();
+        // poll proposals periodically
+        setInterval(loadProposals, 5000);
+      })();
+
+      // keep trade link helper (same as user page)
+      function setTradeLink(user){
+        const a = document.getElementById('tradeLink');
+        if(!a) return; if(user) a.href = '/trade#' + encodeURIComponent(user); else a.href = '/trade';
+      }
+    </script>
+
+  </body>
+</html>

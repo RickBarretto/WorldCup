@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Decks — Main</title>
+    <style>
+      body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}
+      nav a{margin-right:12px}
+      .card{border:1px solid #ddd;padding:12px;border-radius:6px;margin:8px 0}
+    </style>
+  </head>
+  <body>
+    <h1>Decks — Main</h1>
+    <nav>
+      <a href="/admin">Admin</a>
+    </nav>
+
+    <p>Please login with your username to continue.</p>
+
+    <section>
+      <form id="loginForm">
+        <input id="loginUser" placeholder="username" autocomplete="username" />
+        <button type="submit">Go</button>
+      </form>
+    </section>
+
+    <script>
+      document.getElementById('loginForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        const user = document.getElementById('loginUser').value.trim();
+        if(!user) return alert('enter a username');
+        // navigate to /user with fragment containing the username
+        window.location.href = '/user#' + encodeURIComponent(user);
+      });
+    </script>
+
+    <footer style="margin-top:24px;color:#666">Decks frontend — static demo</footer>
+  </body>
+</html>
