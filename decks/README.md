@@ -35,11 +35,11 @@ This minimal static frontend is included under `decks/frontend/` folder and is s
 
 There are 4 pages which you can interact: Homepage, User inventory, Administrator Dashboard and User Trading page.
 
-![Admin](admin.png)
+![Admin](docs/admin.png)
 
-![Inventory](inventory.png)
+![Inventory](docs/inventory.png)
 
-![Trading](trading.png)
+![Trading](docs/trading.png)
 
 
 

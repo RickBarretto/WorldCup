@@ -49,7 +49,7 @@ Open the frontend at `http://localhost:8081`, `http://localhost:8082` or `http:/
 This minimal static frontend is included under `match/frontend/` folder and is served at `/`.
 The UI opens a websocket to `/ws` and posts to `/play`.
 
-![Frontend](frontend.png)
+![Frontend](docs/frontend.png)
 
 ## Public HTTP API
 
