@@ -2,10 +2,46 @@
 
 This service manages the player's decks.
 
-Overview
+## Overview
+
 - Leader election: the node with the highest numeric `-id` is the leader.
 - Leader handles mutating operations and asynchronously replicates them to peers via POST /replicate.
 - Followers forward mutating requests to the leader; GET requests are served locally from each node's deck store.
+
+## Real Usage
+
+### Starting
+
+- **Node 1**
+```sh
+go run ./decks -id=1 -addr=http://localhost:8001 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
+```
+
+- **Node 2**
+```sh
+go run ./decks -id=2 -addr=http://localhost:8002 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
+```
+
+- **Node 3**
+```sh
+go run ./decks -id=3 -addr=http://localhost:8003 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
+```
+
+### Frontend
+
+Open the frontend at `http://localhost:8081`, `http://localhost:8082` or `http://localhost:8083` and interact with it. 
+
+This minimal static frontend is included under `decks/frontend/` folder and is served at `/`.
+
+There are 4 pages which you can interact: Homepage, User inventory, Administrator Dashboard and User Trading page.
+
+![Admin](admin.png)
+
+![Inventory](inventory.png)
+
+![Trading](trading.png)
+
+
 
 ## API Endpoints
 
@@ -42,30 +78,7 @@ Node API:
 
 Some of those endpoints just returns values and others proxies the leader node. But for the user the behavior would be the same for any node.
 
-## Real Usage
-
-### Build
-
-```sh
-go build -o decks.exe ./decks
-```
-
-### Starting
-
-- **Node 1**
-```sh
-./decks.exe -id=1 -addr=http://localhost:8001 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
-```
-
-- **Node 2**
-```sh
-./decks.exe -id=2 -addr=http://localhost:8002 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
-```
-
-- **Node 3**
-```sh
-./decks.exe -id=3 -addr=http://localhost:8003 -peers=1=http://localhost:8001,2=http://localhost:8002,3=http://localhost:8003
-```
+## API Usage
 
 ### Administrator
 
