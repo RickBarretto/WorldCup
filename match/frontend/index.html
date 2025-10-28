@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Match Client</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {font-family: system-ui, -apple-system, Arial; padding:20px; max-width:900px}
+    .row{display:flex;gap:8px;margin-bottom:8px}
+    input[type="text"], input[type="number"]{padding:6px;border:1px solid #ccc;border-radius:4px}
+    button{padding:8px 12px;border-radius:6px}
+    #log{white-space:pre-wrap;background:#f7f7f7;padding:12px;border-radius:6px;border:1px solid #eee;min-height:120px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:6px;text-align:left}
+  </style>
+</head>
+<body>
+  <h2>Simple Match Client</h2>
+  <p>Open a websocket (same host) and submit exactly 5 cards to play.</p>
+
+  <div class="row">
+    <label>Player ID: <input id="playerId" type="text" value="player-` + "`" + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` }>
+    <button id="connectBtn">Connect WS</button>
+    <button id="disconnectBtn" disabled>Disconnect</button>
+  </div>
+
+  <h3>Cards (5)</h3>
+  <table>
+    <thead><tr><th>#</th><th>ID</th><th>Name</th><th>Power</th></tr></thead>
+    <tbody id="cardsTbody"></tbody>
+  </table>
+  <div style="margin-top:8px">
+    <button id="randomize">Randomize Cards</button>
+    <button id="playBtn">Play (POST /play)</button>
+  </div>
+
+  <h3>Log</h3>
+  <div id="log"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
