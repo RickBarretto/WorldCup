@@ -12,16 +12,10 @@ This service allows 1v1 matches between players.
 
 ## Real Usage
 
-### Build
-
-```sh
-go build ./match
-```
-
 ### Run (single server)
 
 ```sh
-./match.exe -port=8081
+go run ./match -port=8081
 ```
 
 ### Run (3 peers)
@@ -29,17 +23,17 @@ go build ./match
 
 - **Node 1**
 ```sh
-./match.exe -port=8081 -peers=localhost:8082,localhost:8083
+go run ./match -port=8081 -peers=localhost:8082,localhost:8083
 ```
 
 - **Node 2**
 ```sh
-./match.exe -port=8082 -peers=localhost:8081,localhost:8083
+go run ./match -port=8082 -peers=localhost:8081,localhost:8083
 ```
 
 - **Node 3**
 ```sh
-./match.exe -port=8083 -peers=localhost:8081,localhost:8082
+go run ./match -port=8083 -peers=localhost:8081,localhost:8082
 ```
 
 ### Frontend
