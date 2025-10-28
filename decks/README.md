@@ -52,28 +52,28 @@ There are two kinds of decks:
 
 Per-user API:
 
-- `GET /users/:user/cards`
+- **GET** `/users/:user/cards`
     - List cards for `:user`
-- `POST /users/:user/cards`
+- **POST** `/users/:user/cards`
     - Add a card for `:user` (JSON: `{"id":123,"name":"ace"}`)
-- `DELETE /users/:user/cards/:id`
+- **DELETE** `/users/:user/cards/:id`
     - Remove card `:id` from `:user`'s deck
 
 Global Deck API:
 
-- `GET /cards`
+- **GET** `/cards`
     - List cards from the global deck
-- `POST /cards`
+- **POST** `/cards`
     - Add a card to the global deck
-- `DELETE /cards/:id`
+- **DELETE** `/cards/:id`
     - Remove a card from the global deck
 
 Node API:
-- `POST /replicate`
+- **POST** `/replicate`
     - Internal endpoint for replication (peers only)
-- `GET /snapshot`
+- **GET** `/snapshot`
     - Internal endpoint for sync with leader (peer only)
-- `GET /status`
+- **GET** `/status`
     - Node status and current leader
 
 Some of those endpoints just returns values and others proxies the leader node. But for the user the behavior would be the same for any node.
