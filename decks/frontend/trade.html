@@ -18,9 +18,7 @@
     <h1>Decks — Trade</h1>
     <nav>
       <a href="/">Main</a>
-      <a href="/admin">Admin</a>
-      <a href="/user">User</a>
-      <a href="/trade">Trade</a>
+      <a id="userLink" href="/user">User</a>
     </nav>
 
     <div class="container">
@@ -55,6 +53,13 @@
     </div>
 
     <script>
+      function setUserLink(user){
+        const a = document.getElementById('userLink');
+        if(!a) return;
+        if(user) a.href = '/user#' + encodeURIComponent(user);
+        else a.href = '/user';
+      }
+
       // helper to parse response: try JSON, fall back to text
       async function parseResponse(res){
         const ct = res.headers.get('content-type') || '';
@@ -205,7 +210,7 @@
         currentUser = decodeURIComponent(hash);
         document.getElementById('hint').style.display = 'none';
         document.getElementById('userTitle').textContent = 'Trade as: ' + currentUser;
-        setTradeLink(currentUser);
+        setUserLink(currentUser);
         loadOwn();
         loadProposals();
         // poll proposals periodically
