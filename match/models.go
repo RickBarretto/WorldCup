@@ -29,8 +29,8 @@ type Match struct {
 }
 
 type WaitingPlayer struct {
-	PlayerID Username
-	Cards    []Card
+	PlayerID Username `json:"player_id"`
+	Cards    []Card   `json:"cards"`
 }
 
 type Challenger = WaitingPlayer

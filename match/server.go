@@ -157,7 +157,8 @@ func (server *Server) notifyLocal(player Username, payload any) {
 	socket := server.Connection(player)
 
 	if socket == nil {
-		log.Printf("no websocket for player %s\n", player)
+		// Print player with %q so empty player IDs are visible in logs
+		log.Printf("no websocket for player %q\n", player)
 		return
 	}
 

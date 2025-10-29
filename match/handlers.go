@@ -81,6 +81,11 @@ func (server *Server) playMatch() http.HandlerFunc {
 			http.Error(writer, "bad json", http.StatusBadRequest)
 			return
 		}
+		// Require a valid player id in the request body.
+		if data.PlayerID == "" {
+			http.Error(writer, "player_id required in request body", http.StatusBadRequest)
+			return
+		}
 		if len(data.Cards) != 5 {
 			http.Error(writer, "must send exactly 5 cards", http.StatusBadRequest)
 			return
