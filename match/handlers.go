@@ -96,6 +96,12 @@ func (server *Server) playMatch() http.HandlerFunc {
 			Cards:    data.Cards,
 		}
 
+		// Disallow a player already in the waiting queue from playing again.
+		if server.IsWaiting(challenger.PlayerID) {
+			http.Error(writer, "player already queued for a match", http.StatusConflict)
+			return
+		}
+
 		// try local match
 		if match, ok := server.tryLocalMatch(challenger); ok {
 			server.notifyLocal(match.Host.ID, map[string]interface{}{"type": "match_start", "match": match})

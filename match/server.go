@@ -91,7 +91,27 @@ func (server *Server) enqueueWaiter(waiter WaitingPlayer) {
 	server.mutex.Lock()
 	defer server.mutex.Unlock()
 
+	// Prevent the same player from being queued multiple times
+	for _, w := range server.waiting {
+		if w.PlayerID == waiter.PlayerID {
+			return
+		}
+	}
+
 	server.waiting = append(server.waiting, waiter)
+}
+
+// IsWaiting reports whether the given player is currently in the waiting queue.
+func (server *Server) IsWaiting(player Username) bool {
+	server.mutex.Lock()
+	defer server.mutex.Unlock()
+
+	for _, w := range server.waiting {
+		if w.PlayerID == player {
+			return true
+		}
+	}
+	return false
 }
 
 func (server *Server) popWaiter() *WaitingPlayer {
