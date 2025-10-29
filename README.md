@@ -51,15 +51,6 @@ from the backend.
 Also, creating a KV storage from the decks algorithm via Leader-Follower consensus.
 With this KV in hands, you could use it anywhere, making more complex systems.
 
-
-### Where is my Docker
-
-This is a requirement of this project be Docker-based. But notice, there is no Dockerfile in this repository.
-This is because, instead of using Docker directly I decided to use Devcontainers, that is a Docker-based tool.
-With Devcontainer I have a deterministic environment using Docker and I also support cloud-based development,
-such as Github Codespaces. This also integrates well with VS Code out-of-box.
-
-
 ## Running it
 
 It's possible to run this project in three different ways: locally, locally into containers, distributed across machines into containers. The first one allow us to test it on development. The second one for demonstration and the third one for real systems.
