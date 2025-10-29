@@ -9,6 +9,9 @@
 
   let ws = null
 
+  // start with Play disabled until websocket is connected
+  playBtn.disabled = true
+
   function log(...args){
     logEl.textContent += args.map(a=>typeof a==='object'?JSON.stringify(a,null,2):String(a)).join(' ') + '\n'
     logEl.scrollTop = logEl.scrollHeight
@@ -54,24 +57,29 @@
   }
 
   connectBtn.addEventListener('click', ()=>{
-    const pid = playerIdEl.value || ('player-'+Math.floor(Math.random()*1000))
+    const pid = playerIdEl.value.trim()
+    if (!pid) { alert('Player ID is required to connect'); return }
     const url = (location.protocol==='https:'? 'wss://' : 'ws://') + location.host + '/ws?player_id=' + encodeURIComponent(pid)
     log('Connecting WS to', url)
     ws = new WebSocket(url)
-    ws.onopen = ()=>{ log('WS open'); connectBtn.disabled = true; disconnectBtn.disabled = false }
+    // enable Play when the websocket connection is open
+    ws.onopen = ()=>{ log('WS open'); connectBtn.disabled = true; disconnectBtn.disabled = false; playBtn.disabled = false }
     ws.onmessage = (ev)=>{ log('WS msg:', JSON.parse(ev.data)) }
-    ws.onclose = ()=>{ log('WS closed'); connectBtn.disabled = false; disconnectBtn.disabled = true }
+    ws.onclose = ()=>{ log('WS closed'); connectBtn.disabled = false; disconnectBtn.disabled = true; playBtn.disabled = true }
     ws.onerror = (e)=>{ log('WS error', e) }
   })
 
   disconnectBtn.addEventListener('click', ()=>{
-    if(ws){ ws.close(); ws = null }
+    if(ws){ ws.close(); ws = null; playBtn.disabled = true }
   })
 
   randomizeBtn.addEventListener('click', randomize)
 
   playBtn.addEventListener('click', async ()=>{
-    const pid = playerIdEl.value || ('player-'+Math.floor(Math.random()*1000))
+    // Only allow play when websocket is connected/open
+    if(!ws || ws.readyState !== WebSocket.OPEN){ alert('Connect websocket before playing'); return }
+    const pid = playerIdEl.value.trim()
+    if (!pid) { alert('Player ID is required'); return }
     const cards = getCards()
     if(cards.length !== 5){ alert('need 5 cards'); return }
     const body = { player_id: pid, cards }

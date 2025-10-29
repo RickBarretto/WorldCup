@@ -27,7 +27,10 @@ func StartServer(address Address, peers []Address) {
 
 	// -- Frontend --
 	fs := http.FileServer(http.Dir("./match/frontend"))
-	http.Handle("/", fs)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		fs.ServeHTTP(w, r)
+	})
 
 	log.Printf("match server listening on %s\n", address)
 	log.Fatal(http.ListenAndServe(address, nil))

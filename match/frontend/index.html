@@ -19,19 +19,30 @@
   <p>Open a websocket (same host) and submit exactly 5 cards to play.</p>
 
   <div class="row">
-    <label>Player ID: <input id="playerId" type="text" value="player-` + "`" + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` + `"` }>
-    <button id="connectBtn">Connect WS</button>
+    <label>Player ID:
+      <input id="playerId" type="text" required
+         oninvalid="this.setCustomValidity('Player ID cannot be empty')"
+         oninput="this.setCustomValidity(''); document.getElementById('connectBtn').disabled = !this.value.trim()">
+    </label>
+    <button id="connectBtn" type="button" disabled>Connect</button>
     <button id="disconnectBtn" disabled>Disconnect</button>
   </div>
 
   <h3>Cards (5)</h3>
   <table>
-    <thead><tr><th>#</th><th>ID</th><th>Name</th><th>Power</th></tr></thead>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Power</th>
+      </tr>
+    </thead>
     <tbody id="cardsTbody"></tbody>
   </table>
   <div style="margin-top:8px">
-    <button id="randomize">Randomize Cards</button>
-    <button id="playBtn">Play (POST /play)</button>
+    <button id="randomize">Random Cards</button>
+    <button id="playBtn">Play</button>
   </div>
 
   <h3>Log</h3>
