@@ -34,11 +34,31 @@ Because of this nature, I've created the `.project/` folder that have the sessio
 
 ## Architecture
 
-This project follows the craftsmanship principles. This is organized by using the Vertical-Slice, but implementing Clean Architecture + Some DDD Principles.
+This is a microservice based project, but I tried to reuse the server the maximum I could.
+Since distributed systems are very complex, this is better to keep them simple with minimal
+behavior.
 
-This was decided to go with microsservices since this probably fits well to this problem and I can scale each service individually as it needs to. Each available service goes into `eleventh/service` and shared code goes on `eleventh/shared`.
+Thinking that way, I decided to create two microservices that could work altogether in a future
+implementation: `decks` and `match`. The first one, focused on managing decks (store user's owned,
+rewarding and also trading).
 
-Each service has its own REST APIs, RPCs, Repositories and its own algorithms for distributed system. Each of them with their own tests and also running instructions. Reach each documentation for more information.
+Each service could easily be decoupled into smaller pieces, but due to the deadline I decided to don't.
+The same goes with the connection of those pieces. Right now, both microservices are not connected,
+and I don't plan due to the deadline. Since a PBl is a Proof-Of-Concept, this is not a big concern.
+
+Both systems could be joined without great issues. But I would recomend to decouple the frontend,
+from the backend.
+Also, creating a KV storage from the decks algorithm via Leader-Follower consensus.
+With this KV in hands, you could use it anywhere, making more complex systems.
+
+
+### Where is my Docker
+
+This is a requirement of this project be Docker-based. But notice, there is no Dockerfile in this repository.
+This is because, instead of using Docker directly I decided to use Devcontainers, that is a Docker-based tool.
+With Devcontainer I have a deterministic environment using Docker and I also support cloud-based development,
+such as Github Codespaces. This also integrates well with VS Code out-of-box.
+
 
 ## Running it
 
@@ -48,4 +68,5 @@ Don't take the application itself too seriously, I am not trying to solve a gami
 
 ## Tooling
 
-This project uses virtual environment managed by Poetry, so make sure you have this installed to run this properly.
+This project is Go-based, so certify yourself you have it installed.
+You can also use devcontainers to run in a deterministic environment.
