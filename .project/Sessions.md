@@ -70,3 +70,25 @@ Here’s a concise, consistent summary for **Session 2**, following the same for
 * Research and propose **data consistency mechanisms** for distributed card state management.
 * **Implement inter-server communication** to synchronize matches and game state.
 * (Optional) Create a **proof of concept** demonstrating full communication flow between two clients routed via MQTT brokers and intermediate servers.
+
+---
+
+## Week 3 — 09/10/2025
+
+**Ideas**
+
+* Host server to manage the match between two servers
+* Token-based mutual exclusion to manage matches and decks
+    * Use a middleware to make sure only peers with token can process the request
+* Raft to elect the leader to manage the global card stock
+* Redis as message broker
+* Reset the settings when some peer goes down
+
+**Questions**
+
+* What should be tested?
+
+**Goals**
+
+* Architectural diagram of the system
+* Apply publisher-subscriber for client-server pattern
