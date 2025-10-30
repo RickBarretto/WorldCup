@@ -18,7 +18,7 @@ func parseCli() CliArguments {
 	flag.StringVar(&rawPeers, "peers", "", "comma-separated peer host:port list")
 	flag.Parse()
 
-	address := fmt.Sprintf("localhost:%s", port)
+	address := fmt.Sprintf("0.0.0.0:%s", port)
 	peers := []Address{}
 
 	if rawPeers != "" {

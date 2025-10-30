@@ -11,7 +11,7 @@
 
 	// Publish all exposed ports from the container to the host. This uses Docker's
 	// `-P` flag so any EXPOSEd ports will be available on ephemeral host ports.
-	"runArgs": ["-P"],
+	"runArgs": ["--network=host"],
 
 	// Optionally specify known ports to forward (keep empty since we publish all ports)
 	"forwardPorts": []
